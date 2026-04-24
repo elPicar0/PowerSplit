@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PowerSplit — Live Simulator</title>
+<meta name="description" content="PowerSplit electricity cost splitter simulator. Track per-socket usage and split bills fairly.">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <h1>PowerSplit</h1>
+        <p class="tagline">Transparent Electricity · Fair Bills · Zero Surprises</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot"></span>
+        <span id="statusText">SIMULATION ACTIVE</span>
+      </div>
+      <button class="reset-btn" id="resetBtn" title="Reset Session">↻ Reset</button>
+    </div>
+  </header>
+
+  <!-- OLED Preview -->
+  <section class="oled-section">
+    <div class="section-label">OLED Display Preview</div>
+    <div class="oled-frame">
+      <div class="oled-bezel">
+        <canvas id="oledCanvas" width="256" height="128"></canvas>
+      </div>
+      <div class="oled-label">SSD1306 · 128×64 · I²C</div>
+    </div>
+  </section>
+
+  <!-- Controls -->
+  <section class="controls-section">
+    <div class="control-card user-a">
+      <div class="card-header">
+        <div class="user-avatar">A</div>
+        <div>
+          <div class="user-label">User A</div>
+          <div class="user-sub">Socket 1 · GPIO 34</div>
+        </div>
+      </div>
+      <div class="slider-group">
+        <label>Simulated Load</label>
+        <input type="range" id="sliderA" min="0" max="100" value="0" class="slider slider-a">
+        <div class="device-ticks">
+          <span>Phone<br>5W</span>
+          <span>+Fan<br>80W</span>
+          <span>+Laptop<br>145W</span>
+          <span>+AC<br>1645W</span>
+        </div>
+      </div>
+      <div class="device-badge" id="deviceA">📱 Phone charger (5W)</div>
+      <div class="live-stats">
+        <div class="stat"><span class="stat-label">Power</span><span class="stat-value" id="powerA">5 W</span></div>
+        <div class="stat"><span class="stat-label">Energy</span><span class="stat-value" id="energyA">0.000 kWh</span></div>
+        <div class="stat cost"><span class="stat-label">Cost</span><span class="stat-value" id="costA">₹ 0.00</span></div>
+      </div>
+    </div>
+
+    <div class="control-card user-b">
+      <div class="card-header">
+        <div class="user-avatar">B</div>
+        <div>
+          <div class="user-label">User B</div>
+          <div class="user-sub">Socket 2 · GPIO 35</div>
+        </div>
+      </div>
+      <div class="slider-group">
+        <label>Simulated Load</label>
+        <input type="range" id="sliderB" min="0" max="100" value="0" class="slider slider-b">
+        <div class="device-ticks">
+          <span>Phone<br>5W</span>
+          <span>+Geyser<br>2005W</span>
+          <span>+TV<br>2105W</span>
+          <span>+AC<br>3605W</span>
+        </div>
+      </div>
+      <div class="device-badge" id="deviceB">📱 Phone charger (5W)</div>
+      <div class="live-stats">
+        <div class="stat"><span class="stat-label">Power</span><span class="stat-value" id="powerB">5 W</span></div>
+        <div class="stat"><span class="stat-label">Energy</span><span class="stat-value" id="energyB">0.000 kWh</span></div>
+        <div class="stat cost"><span class="stat-label">Cost</span><span class="stat-value" id="costB">₹ 0.00</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Outage Warning -->
+  <section class="outage-banner" id="outageBanner" style="display:none;">
+    <div class="outage-inner">
+      <span class="outage-icon">⚠️</span>
+      <span class="outage-text">!! CUT AC/GEYSER NOW — Combined load exceeds 3000W</span>
+    </div>
+  </section>
+
+  <!-- Dashboard Cards -->
+  <section class="dashboard">
+    <div class="dash-card total-card">
+      <div class="dash-icon">💰</div>
+      <div class="dash-label">Total Cost</div>
+      <div class="dash-value" id="totalCost">₹ 0.00</div>
+    </div>
+    <div class="dash-card projected-card">
+      <div class="dash-icon">📊</div>
+      <div class="dash-label">Projected Monthly</div>
+      <div class="dash-value" id="projectedMonthly">₹ 0</div>
+    </div>
+    <div class="dash-card split-card">
+      <div class="dash-icon">⚖️</div>
+      <div class="dash-label">Fair Split</div>
+      <div class="split-bar-container">
+        <div class="split-bar">
+          <div class="split-fill-a" id="splitBarA" style="width:50%"></div>
+        </div>
+        <div class="split-labels">
+          <span id="splitPctA">A: 50%</span>
+          <span id="splitPctB">B: 50%</span>
+        </div>
+      </div>
+    </div>
+    <div class="dash-card load-card">
+      <div class="dash-icon">🔌</div>
+      <div class="dash-label">Combined Load</div>
+      <div class="dash-value" id="combinedLoad">10 W</div>
+      <div class="load-status" id="loadStatus">✓ OK</div>
+    </div>
+  </section>
+
+  <!-- Usage Chart -->
+  <section class="chart-section">
+    <div class="section-label">Cost Over Time</div>
+    <div class="chart-frame">
+      <canvas id="chartCanvas" width="800" height="200"></canvas>
+    </div>
+    <div class="chart-legend">
+      <span class="legend-a">■ User A</span>
+      <span class="legend-b">■ User B</span>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <section class="settings-section">
+    <div class="section-label">Configuration</div>
+    <div class="settings-grid">
+      <div class="setting">
+        <label for="tariff">Tariff (₹/kWh)</label>
+        <input type="number" id="tariff" value="5.5" step="0.1" min="0">
+      </div>
+      <div class="setting">
+        <label for="timeScale">Time Scale</label>
+        <select id="timeScale">
+          <option value="1">1× (Real-time)</option>
+          <option value="60">60× (1 min = 1 hr)</option>
+          <option value="360" selected>360× (10s = 1 hr)</option>
+          <option value="3600">3600× (1s = 1 hr)</option>
+        </select>
+      </div>
+      <div class="setting">
+        <label for="outageThreshold">Outage Threshold (W)</label>
+        <input type="number" id="outageThreshold" value="3000" step="100" min="500">
+      </div>
+    </div>
+    <button class="download-btn" id="downloadBill">📄 Download Bill Summary</button>
+  </section>
+
+  <footer class="footer">
+    <p>PESU Hackathon 2026 · PowerSplit Simulator · Zero Surprises ⚡</p>
+  </footer>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

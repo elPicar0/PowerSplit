@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PowerSplit Harbinger — Appliance Toggle Simulator</title>
+<meta name="description" content="PowerSplit Harbinger: toggle individual appliances on/off, see real-time cost split between flatmates.">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <h1>PowerSplit <span class="edition">Harbinger</span></h1>
+        <p class="tagline">Toggle Appliances · See Real Cost · Split Fairly</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill"><span class="status-dot"></span>LIVE</div>
+      <button class="reset-btn" id="resetBtn">↻ Reset</button>
+    </div>
+  </header>
+
+  <!-- OLED Preview -->
+  <section class="oled-section">
+    <div class="section-label">OLED Display Preview</div>
+    <div class="oled-frame">
+      <div class="oled-bezel"><canvas id="oledCanvas" width="256" height="128"></canvas></div>
+      <div class="oled-label">SSD1306 · 128×64 · I²C</div>
+    </div>
+  </section>
+
+  <!-- Appliance Panels -->
+  <section class="panels">
+    <!-- User A -->
+    <div class="panel panel-a">
+      <div class="panel-header">
+        <div class="user-avatar">A</div>
+        <div><div class="user-label">User A</div><div class="user-sub">Personal devices</div></div>
+      </div>
+      <div class="appliance-grid" id="gridA"></div>
+      <div class="panel-stats">
+        <div class="ps"><span class="ps-label">Load</span><span class="ps-val" id="loadA">0 W</span></div>
+        <div class="ps"><span class="ps-label">Energy</span><span class="ps-val" id="energyA">0.000 kWh</span></div>
+        <div class="ps total"><span class="ps-label">Cost (own + share)</span><span class="ps-val" id="costA">₹ 0.00</span></div>
+      </div>
+    </div>
+
+    <!-- Common -->
+    <div class="panel panel-common">
+      <div class="panel-header">
+        <div class="user-avatar common-av">C</div>
+        <div><div class="user-label">Common</div><div class="user-sub">Cost split 50/50</div></div>
+      </div>
+      <div class="appliance-grid" id="gridCommon"></div>
+      <div class="panel-stats">
+        <div class="ps"><span class="ps-label">Load</span><span class="ps-val" id="loadC">0 W</span></div>
+        <div class="ps"><span class="ps-label">Energy</span><span class="ps-val" id="energyC">0.000 kWh</span></div>
+        <div class="ps total"><span class="ps-label">Shared Cost</span><span class="ps-val" id="costC">₹ 0.00</span></div>
+      </div>
+    </div>
+
+    <!-- User B -->
+    <div class="panel panel-b">
+      <div class="panel-header">
+        <div class="user-avatar av-b">B</div>
+        <div><div class="user-label">User B</div><div class="user-sub">Personal devices</div></div>
+      </div>
+      <div class="appliance-grid" id="gridB"></div>
+      <div class="panel-stats">
+        <div class="ps"><span class="ps-label">Load</span><span class="ps-val" id="loadB">0 W</span></div>
+        <div class="ps"><span class="ps-label">Energy</span><span class="ps-val" id="energyB">0.000 kWh</span></div>
+        <div class="ps total"><span class="ps-label">Cost (own + share)</span><span class="ps-val" id="costB">₹ 0.00</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Outage Warning -->
+  <section class="outage-banner" id="outageBanner" style="display:none">
+    <span class="outage-icon">⚠️</span>
+    <span class="outage-text">!! OVERLOAD — Cut high-draw appliances now!</span>
+  </section>
+
+  <!-- Dashboard -->
+  <section class="dashboard">
+    <div class="dash-card"><div class="dash-icon">💰</div><div class="dash-label">Total Cost</div><div class="dash-value" id="totalCost">₹ 0.00</div></div>
+    <div class="dash-card"><div class="dash-icon">📊</div><div class="dash-label">Projected Monthly</div><div class="dash-value proj" id="projMonthly">₹ 0</div></div>
+    <div class="dash-card"><div class="dash-icon">🔌</div><div class="dash-label">Combined Load</div><div class="dash-value" id="combinedLoad">0 W</div><div class="load-status ok" id="loadStatus">✓ OK</div></div>
+    <div class="dash-card">
+      <div class="dash-icon">⚖️</div><div class="dash-label">Fair Split</div>
+      <div class="split-bar"><div class="split-fill-a" id="splitBarA" style="width:50%"></div></div>
+      <div class="split-labels"><span id="splitPctA">A: ₹0</span><span id="splitPctB">B: ₹0</span></div>
+    </div>
+  </section>
+
+  <!-- Usage Chart -->
+  <section class="chart-section">
+    <div class="section-label">Cost Over Time</div>
+    <div class="chart-frame">
+      <canvas id="chartCanvas" width="800" height="200"></canvas>
+    </div>
+    <div class="chart-legend">
+      <span class="legend-a">■ User A (total)</span>
+      <span class="legend-c">■ Common</span>
+      <span class="legend-b">■ User B (total)</span>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <section class="settings-section">
+    <div class="section-label">Configuration</div>
+    <div class="settings-grid">
+      <div class="setting"><label for="tariff">Tariff (₹/kWh)</label><input type="number" id="tariff" value="5.5" step="0.1" min="0"></div>
+      <div class="setting"><label for="timeScale">Time Scale</label>
+        <select id="timeScale">
+          <option value="1">1× Real-time</option>
+          <option value="60">60×</option>
+          <option value="360" selected>360×</option>
+          <option value="3600">3600×</option>
+        </select>
+      </div>
+      <div class="setting"><label for="outageW">Outage Threshold (W)</label><input type="number" id="outageW" value="3000" step="100" min="500"></div>
+    </div>
+    <button class="download-btn" id="downloadBill">📄 Download Bill Summary</button>
+  </section>
+
+  <footer class="footer">PESU Hackathon 2026 · PowerSplit Harbinger ⚡</footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

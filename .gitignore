@@ -1,0 +1,25 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Arduino build artifacts
+PowerSplit/build/
+*.elf
+*.hex
+*.bin
+
+# Node
+node_modules/
+package-lock.json
+
+# Misc
+*.zip
+*.log
