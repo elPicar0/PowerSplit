@@ -1,183 +1,233 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PowerSplit — Live Simulator</title>
-<meta name="description" content="PowerSplit electricity cost splitter simulator. Track per-socket usage and split bills fairly.">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PowerSplit — Live Dashboard</title>
+  <meta name="description" content="PowerSplit electricity cost splitter. Track per-socket usage in real time and split bills fairly between flatmates.">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Press+Start+2P&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <div class="logo-icon">⚡</div>
-      <div>
-        <h1>PowerSplit</h1>
-        <p class="tagline">Transparent Electricity · Fair Bills · Zero Surprises</p>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <i class="fa-solid fa-bolt text-purple"></i>
+        <span class="text-gradient">PowerSplit</span>
       </div>
-    </div>
-    <div class="header-right">
-      <div class="status-pill" id="statusPill">
-        <span class="status-dot"></span>
-        <span id="statusText">SIMULATION ACTIVE</span>
-      </div>
-      <button class="reset-btn" id="resetBtn" title="Reset Session">↻ Reset</button>
-    </div>
-  </header>
+      <ul class="nav-menu">
+        <li class="nav-item active" onclick="window.ui.switchTab('dashboard')">
+          <i class="fa-solid fa-chart-pie"></i> Dashboard
+        </li>
+        <li class="nav-item" onclick="window.ui.switchTab('profiles')">
+          <i class="fa-solid fa-users"></i> Profiles
+        </li>
+        <li class="nav-item" onclick="window.ui.switchTab('analytics')">
+          <i class="fa-solid fa-chart-line"></i> Analytics
+        </li>
+        <li class="nav-item" onclick="window.ui.switchTab('settings')">
+          <i class="fa-solid fa-gear"></i> Settings
+        </li>
+      </ul>
 
-  <!-- OLED Preview -->
-  <section class="oled-section">
-    <div class="section-label">OLED Display Preview</div>
-    <div class="oled-frame">
-      <div class="oled-bezel">
-        <canvas id="oledCanvas" width="256" height="128"></canvas>
-      </div>
-      <div class="oled-label">SSD1306 · 128×64 · I²C</div>
-    </div>
-  </section>
+      <!-- Connect Hardware Button -->
+      <button id="btnConnect" class="btn-primary mt-auto" onclick="window.app.connectHardware()">
+        <i class="fa-solid fa-microchip"></i> Connect ESP32
+      </button>
+      <div id="hardwareStatus" class="status-text mt-2"><span class="status-dot red"></span> Simulation Mode</div>
+    </aside>
 
-  <!-- Controls -->
-  <section class="controls-section">
-    <div class="control-card user-a">
-      <div class="card-header">
-        <div class="user-avatar">A</div>
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="dashboard-header">
         <div>
-          <div class="user-label">User A</div>
-          <div class="user-sub">Socket 1 · GPIO 34</div>
+          <h1>Energy Workspace</h1>
+          <p class="text-secondary">Transparent Electricity · Fair Bills · Zero Surprises</p>
         </div>
-      </div>
-      <div class="slider-group">
-        <label>Simulated Load</label>
-        <input type="range" id="sliderA" min="0" max="100" value="0" class="slider slider-a">
-        <div class="device-ticks">
-          <span>Phone<br>5W</span>
-          <span>+Fan<br>80W</span>
-          <span>+Laptop<br>145W</span>
-          <span>+AC<br>1645W</span>
+        <div class="header-actions">
+          <button class="btn-secondary" onclick="window.app.resetAll()">
+            <i class="fa-solid fa-rotate-right"></i> Reset
+          </button>
+          <button class="btn-secondary" onclick="window.ui.openModal()">
+            <i class="fa-solid fa-plus"></i> New Profile
+          </button>
+          <button class="btn-secondary" onclick="window.app.downloadBill()">
+            <i class="fa-solid fa-download"></i> Export Bill
+          </button>
         </div>
-      </div>
-      <div class="device-badge" id="deviceA">📱 Phone charger (5W)</div>
-      <div class="live-stats">
-        <div class="stat"><span class="stat-label">Power</span><span class="stat-value" id="powerA">5 W</span></div>
-        <div class="stat"><span class="stat-label">Energy</span><span class="stat-value" id="energyA">0.000 kWh</span></div>
-        <div class="stat cost"><span class="stat-label">Cost</span><span class="stat-value" id="costA">₹ 0.00</span></div>
-      </div>
-    </div>
+      </header>
 
-    <div class="control-card user-b">
-      <div class="card-header">
-        <div class="user-avatar">B</div>
+      <!-- Alert Banner -->
+      <div id="alertBanner" class="alert-banner hidden">
+        <i class="fa-solid fa-triangle-exclamation fa-fade"></i>
         <div>
-          <div class="user-label">User B</div>
-          <div class="user-sub">Socket 2 · GPIO 35</div>
+          <strong>⚠ OVERLOAD — CUT AC/GEYSER NOW</strong>
+          <p id="alertMessage">Combined load exceeds threshold. Reduce usage immediately.</p>
         </div>
       </div>
-      <div class="slider-group">
-        <label>Simulated Load</label>
-        <input type="range" id="sliderB" min="0" max="100" value="0" class="slider slider-b">
-        <div class="device-ticks">
-          <span>Phone<br>5W</span>
-          <span>+Geyser<br>2005W</span>
-          <span>+TV<br>2105W</span>
-          <span>+AC<br>3605W</span>
+
+      <!-- Smart Suggestion Banner -->
+      <div id="suggestionBanner" class="suggestion-banner hidden">
+        <i class="fa-regular fa-lightbulb text-yellow"></i>
+        <span id="suggestionText">Smart suggestion goes here.</span>
+      </div>
+
+      <!-- Tab: Dashboard -->
+      <div id="tab-dashboard" class="tab-pane active">
+        <!-- Global Stats -->
+        <div class="metrics-grid">
+          <div class="glass-panel metric-card">
+            <div class="metric-header">
+              <i class="fa-solid fa-bolt text-purple"></i> Total Load
+            </div>
+            <div class="metric-value text-purple"><span id="valTotalLoad">0</span><small>W</small></div>
+            <div class="load-bar-container mt-2">
+              <div id="totalLoadBar" class="load-bar fill-purple"></div>
+            </div>
+            <div class="load-status-text mt-2" id="loadStatusText">✓ OK</div>
+          </div>
+          <div class="glass-panel metric-card">
+            <div class="metric-header">
+              <i class="fa-solid fa-battery-full text-cyan"></i> Total Energy
+            </div>
+            <div class="metric-value text-cyan"><span id="valTotalEnergy">0.00</span><small>kWh</small></div>
+          </div>
+          <div class="glass-panel metric-card">
+            <div class="metric-header">
+              <i class="fa-solid fa-indian-rupee-sign text-green"></i> Total Bill
+            </div>
+            <div class="metric-value text-green">₹<span id="valTotalCost">0.00</span></div>
+            <div class="text-secondary mt-2" style="font-size: 12px">Projected: ₹<span id="valProjected">0.00</span>/mo</div>
+          </div>
+          <!-- OLED Canvas Preview -->
+          <div class="glass-panel metric-card oled-card">
+            <div class="oled-bezel">
+              <canvas id="oledCanvas" width="256" height="128"></canvas>
+            </div>
+            <div class="oled-label">SSD1306 · 128×64 · I²C</div>
+          </div>
+        </div>
+
+        <!-- Split Bar -->
+        <div class="glass-panel split-panel mt-4">
+          <div class="split-header">
+            <i class="fa-solid fa-scale-balanced text-yellow"></i>
+            <span>Fair Split</span>
+          </div>
+          <div class="split-bar-container">
+            <div class="split-bar">
+              <div class="split-fill-a" id="splitBarA" style="width:50%"></div>
+            </div>
+            <div class="split-labels">
+              <span id="splitLabelA">A: 50% · ₹0.00</span>
+              <span id="splitLabelB">B: 50% · ₹0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="charts-grid mt-4">
+          <!-- Gamification Panel -->
+          <div class="glass-panel gamification-panel">
+            <h3><i class="fa-solid fa-trophy text-yellow"></i> Efficiency Leaderboard</h3>
+            <div id="leaderboardList" class="leaderboard-list"></div>
+            <h4 class="mt-4">Top Badges</h4>
+            <div class="achievements-grid" id="badgesList"></div>
+          </div>
+
+          <div class="glass-panel chart-container">
+             <h3>Cost Split</h3>
+             <div class="chart-wrapper">
+               <canvas id="pieChart"></canvas>
+             </div>
+          </div>
         </div>
       </div>
-      <div class="device-badge" id="deviceB">📱 Phone charger (5W)</div>
-      <div class="live-stats">
-        <div class="stat"><span class="stat-label">Power</span><span class="stat-value" id="powerB">5 W</span></div>
-        <div class="stat"><span class="stat-label">Energy</span><span class="stat-value" id="energyB">0.000 kWh</span></div>
-        <div class="stat cost"><span class="stat-label">Cost</span><span class="stat-value" id="costB">₹ 0.00</span></div>
+
+      <!-- Tab: Profiles -->
+      <div id="tab-profiles" class="tab-pane">
+        <div id="usersGrid" class="users-grid"></div>
       </div>
-    </div>
-  </section>
 
-  <!-- Outage Warning -->
-  <section class="outage-banner" id="outageBanner" style="display:none;">
-    <div class="outage-inner">
-      <span class="outage-icon">⚠️</span>
-      <span class="outage-text">!! CUT AC/GEYSER NOW — Combined load exceeds 3000W</span>
-    </div>
-  </section>
-
-  <!-- Dashboard Cards -->
-  <section class="dashboard">
-    <div class="dash-card total-card">
-      <div class="dash-icon">💰</div>
-      <div class="dash-label">Total Cost</div>
-      <div class="dash-value" id="totalCost">₹ 0.00</div>
-    </div>
-    <div class="dash-card projected-card">
-      <div class="dash-icon">📊</div>
-      <div class="dash-label">Projected Monthly</div>
-      <div class="dash-value" id="projectedMonthly">₹ 0</div>
-    </div>
-    <div class="dash-card split-card">
-      <div class="dash-icon">⚖️</div>
-      <div class="dash-label">Fair Split</div>
-      <div class="split-bar-container">
-        <div class="split-bar">
-          <div class="split-fill-a" id="splitBarA" style="width:50%"></div>
-        </div>
-        <div class="split-labels">
-          <span id="splitPctA">A: 50%</span>
-          <span id="splitPctB">B: 50%</span>
+      <!-- Tab: Analytics -->
+      <div id="tab-analytics" class="tab-pane">
+        <div class="charts-grid-large">
+          <div class="glass-panel chart-container">
+             <h3>Cost Over Time</h3>
+             <div class="chart-wrapper">
+               <canvas id="lineChart"></canvas>
+             </div>
+          </div>
+          <div class="glass-panel chart-container mt-4">
+             <h3>Energy Usage by Profile</h3>
+             <div class="chart-wrapper">
+               <canvas id="barChart"></canvas>
+             </div>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="dash-card load-card">
-      <div class="dash-icon">🔌</div>
-      <div class="dash-label">Combined Load</div>
-      <div class="dash-value" id="combinedLoad">10 W</div>
-      <div class="load-status" id="loadStatus">✓ OK</div>
-    </div>
-  </section>
 
-  <!-- Usage Chart -->
-  <section class="chart-section">
-    <div class="section-label">Cost Over Time</div>
-    <div class="chart-frame">
-      <canvas id="chartCanvas" width="800" height="200"></canvas>
-    </div>
-    <div class="chart-legend">
-      <span class="legend-a">■ User A</span>
-      <span class="legend-b">■ User B</span>
-    </div>
-  </section>
+      <!-- Tab: Settings -->
+      <div id="tab-settings" class="tab-pane">
+        <div class="glass-panel p-4 max-w-md">
+          <h3>Simulation Settings</h3>
+          <div class="form-group mt-3">
+            <label>Tariff (₹ per kWh)</label>
+            <input type="number" id="inputTariff" value="5.5" step="0.1" min="0">
+          </div>
+          <div class="form-group">
+            <label>Overload Threshold (W)</label>
+            <input type="number" id="inputThreshold" value="3000" step="100" min="500">
+          </div>
+          <div class="form-group">
+            <label>Time Scaling</label>
+            <select id="inputTimeScale">
+              <option value="1">1× (Real time)</option>
+              <option value="60">60× (1 min = 1 hr)</option>
+              <option value="360" selected>360× (10s = 1 hr)</option>
+              <option value="3600">3600× (1s = 1 hr)</option>
+            </select>
+          </div>
+          <button class="btn-primary" onclick="window.app.saveSettings()">
+            <i class="fa-solid fa-floppy-disk"></i> Save Settings
+          </button>
+        </div>
 
-  <!-- Settings -->
-  <section class="settings-section">
-    <div class="section-label">Configuration</div>
-    <div class="settings-grid">
-      <div class="setting">
-        <label for="tariff">Tariff (₹/kWh)</label>
-        <input type="number" id="tariff" value="5.5" step="0.1" min="0">
+        <div class="glass-panel p-4 max-w-md mt-4">
+          <h3>About</h3>
+          <p class="text-secondary mt-2" style="line-height:1.6">
+            <strong class="text-gradient">PowerSplit</strong> tracks electricity consumption per socket in real time,
+            converts it to rupees, projects the monthly bill, and splits the cost fairly between flatmates.<br><br>
+            PESU Hackathon 2026 · PS-11 Open · Electrical Theme<br>
+            <a href="https://github.com/elPicar0/PowerSplit" style="color:var(--neon-cyan)">github.com/elPicar0/PowerSplit</a>
+          </p>
+        </div>
       </div>
-      <div class="setting">
-        <label for="timeScale">Time Scale</label>
-        <select id="timeScale">
-          <option value="1">1× (Real-time)</option>
-          <option value="60">60× (1 min = 1 hr)</option>
-          <option value="360" selected>360× (10s = 1 hr)</option>
-          <option value="3600">3600× (1s = 1 hr)</option>
-        </select>
+    </main>
+  </div>
+
+  <!-- Add User Modal -->
+  <div id="addUserModal" class="modal-overlay hidden">
+    <div class="glass-panel modal-content">
+      <h2>Create Profile</h2>
+      <div class="form-group mt-3">
+        <label>Name</label>
+        <input type="text" id="newUserName" placeholder="e.g., Ananya">
       </div>
-      <div class="setting">
-        <label for="outageThreshold">Outage Threshold (W)</label>
-        <input type="number" id="outageThreshold" value="3000" step="100" min="500">
+      <div class="form-group">
+        <label>Theme Color</label>
+        <input type="color" id="newUserColor" value="#b026ff" class="color-picker">
+      </div>
+      <div class="modal-actions mt-4">
+        <button class="btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
+        <button class="btn-primary" onclick="window.app.addProfile()">Add Profile</button>
       </div>
     </div>
-    <button class="download-btn" id="downloadBill">📄 Download Bill Summary</button>
-  </section>
+  </div>
 
-  <footer class="footer">
-    <p>PESU Hackathon 2026 · PowerSplit Simulator · Zero Surprises ⚡</p>
-  </footer>
-</div>
-
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
