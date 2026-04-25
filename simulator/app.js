@@ -289,7 +289,39 @@ class PowerSplitLive {
       while (true) {
         var { value, done } = await this.reader.read(); if (done) break;
         buf += value; var lines = buf.split('\n'); buf = lines.pop();
-        for (var ln of lines) { try { var d = JSON.parse(ln.trim()); if(d.A!==undefined) this.inputs.A.potVal=d.A; if(d.B!==undefined) this.inputs.B.potVal=d.B; } catch(e){} }
+        for (var ln of lines) {
+          try {
+            var d = JSON.parse(ln.trim());
+            // Skip status/error messages from boot
+            if (d.status || d.error) { console.log('ESP32:', d.status || d.error); continue; }
+            // Feed raw pot values (for drift-free hardware input)
+            if (d.A !== undefined) this.inputs.A.potVal = d.A;
+            if (d.B !== undefined) this.inputs.B.potVal = d.B;
+            // Apply computed values directly from Arduino to profiles
+            // This makes dashboard match the OLED display exactly
+            var chA = this.profiles.find(p => p.channel === 'A');
+            var chB = this.profiles.find(p => p.channel === 'B');
+            if (chA && d.wA !== undefined) {
+              chA.load = d.wA;
+              chA._dev = { watts: d.wA, label: d.lA || '', desc: (d.lA || 'Idle') + ' (' + Math.round(d.wA) + 'W)' };
+              if (d.eA !== undefined) chA.energy = d.eA;
+              if (d.cA !== undefined) chA.cost = d.cA;
+            }
+            if (chB && d.wB !== undefined) {
+              chB.load = d.wB;
+              chB._dev = { watts: d.wB, label: d.lB || '', desc: (d.lB || 'Idle') + ' (' + Math.round(d.wB) + 'W)' };
+              if (d.eB !== undefined) chB.energy = d.eB;
+              if (d.cB !== undefined) chB.cost = d.cB;
+            }
+            // Apply totals from Arduino
+            if (d.tW !== undefined) this.totalLoad = d.tW;
+            if (d.tot !== undefined) this.totalCost = d.tot;
+            this.totalEnergy = this.profiles.reduce((a, p) => a + p.energy, 0);
+            // Store hardware projection and ACS reading for display
+            if (d.proj !== undefined) this._hwProj = d.proj;
+            if (d.acs !== undefined) this._hwAcs = d.acs;
+          } catch(e) {}
+        }
       }
     } catch(e) {
       this.isHardwareConnected = false;
